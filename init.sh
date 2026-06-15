@@ -79,4 +79,4 @@ if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
 fi
 
 success "Installation complete! 🎉"
-echo -e "Run '${CYAN}system${NONE}' to launch your script."
+echo -e "Reboot the VM and run '${CYAN}system${NONE}' to launch your script."
