@@ -65,7 +65,18 @@ info() {
 }
 
 help() {
-    echo "test"
+    echo -e "${CYAN}Usage:${NONE} system <command>\n"
+    echo -e "${GREEN}Available commands:${NONE}"
+    echo -e "  ${YELLOW}install${NONE}           Install dev tools (Java, Maven, nvm, pnpm, GCC, uv, TeX Live, shfmt)"
+    echo -e "  ${YELLOW}install-services${NONE}  Install services (MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Neo4j, Syncthing, GitHub CLI, Firefox, Claude Code)"
+    echo -e "  ${YELLOW}config${NONE}            Configure installed tools (npm, MySQL/PostgreSQL/MariaDB, Syncthing auto-export)"
+    echo -e "  ${YELLOW}start${NONE}             Start all installed services"
+    echo -e "  ${YELLOW}stop${NONE}              Stop all installed services"
+    echo -e "  ${YELLOW}latex-deps${NONE}        Install LaTeX packages (base / extra / full)"
+    echo -e "  ${YELLOW}java-switcher${NONE}     Interactively switch Java version and update JAVA_HOME"
+    echo -e "  ${YELLOW}clean-zone${NONE}        Remove Zone.Identifier files recursively in a given directory (WSL command)"
+    echo -e "  ${YELLOW}script-version${NONE}    Print current version and check GitHub for newer releases"
+    echo -e "  ${YELLOW}help${NONE}              Show this help message"
 }
 
 timer() {
@@ -623,7 +634,12 @@ case $1 in
             echo -e "  ./init.sh"
         fi
         ;;
+    help)
+        help
+        ;;
     *)
-        echo "error"
+        error "Unknown command: $1"
+        echo ""
+        help
         ;;
 esac
