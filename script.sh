@@ -75,6 +75,7 @@ help() {
 	echo -e "  ${YELLOW}latex-deps${NONE}        Install LaTeX packages (base / extra / full)"
 	echo -e "  ${YELLOW}java-switcher${NONE}     Interactively switch Java version and update JAVA_HOME"
 	echo -e "  ${YELLOW}clean-zone${NONE}        Remove Zone.Identifier files recursively in a given directory (WSL command)"
+	echo -e "  ${YELLOW}connect-docker${NONE}    Connect to the docker socket on host. This uses the Docker Desktop default socket."
 	echo -e "  ${YELLOW}script-version${NONE}    Print current version and check GitHub for newer releases"
 	echo -e "  ${YELLOW}help${NONE}              Show this help message"
 }
@@ -638,6 +639,7 @@ connect-docker)
 	case "$choice" in
 	1)
 		sudo apt install -y docker.io docker-compose-v2
+		sudo usermod -aG docker $USER
 		grep -qxF 'alias docker-compose="docker compose"' ~/.bashrc ||
 			echo 'alias docker-compose="docker compose"' >>~/.bashrc
 		success "Docker installed. Alias docker-compose added to ~/.bashrc."
