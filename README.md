@@ -228,7 +228,17 @@ system install-services
 **Available Services:**
 
 - **Databases:** MySQL, PostgreSQL, SQLite, Apache Cassandra, MongoDB, Redis, Neo4j
-- **Tools:** Syncthing (file synchronization), GitHub CLI
+- **Tools:** Syncthing (file synchronization), GitHub CLI, Claude Code, Oh My Posh (prompt theme engine)
+
+#### Oh My Posh Config
+
+Put your own theme in [`oh-my-posh/config.omp.json`](oh-my-posh/config.omp.json) **before** running `./init.sh` — `init.sh` copies it to `~/.script/`, and the installer then offers to:
+
+1. Copy it to `~/.config/oh-my-posh/config.omp.json` (any existing config is backed up to `.bak`)
+2. Add `eval "$(oh-my-posh init bash --config "$HOME/.config/oh-my-posh/config.omp.json")"` to your `.bashrc`/`.zshrc`
+3. Install a Nerd Font (`oh-my-posh font install`) — required for the prompt icons
+
+If the file is missing, Oh My Posh is installed with its default theme.
 
 **Related Documentation:**
 

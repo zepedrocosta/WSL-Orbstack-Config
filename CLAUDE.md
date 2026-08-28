@@ -24,7 +24,7 @@ All commands use the `system` alias (points to `~/.script/script.sh`):
 
 ```bash
 system install           # Interactive install: Java 17/21, Maven, nvm, pnpm, GCC, Make, uv, TeX Live, shfmt
-system install-services  # Interactive install: MySQL, PostgreSQL, SQLite, Cassandra, MongoDB, Redis, Neo4j, Syncthing, GitHub CLI, Firefox, Claude Code
+system install-services  # Interactive install: MySQL, PostgreSQL, SQLite, Cassandra, MongoDB, Redis, Neo4j, Syncthing, GitHub CLI, Firefox, Claude Code, Oh My Posh
 system config            # Configure installed tools (nvm npm, MySQL/PostgreSQL/MariaDB, Syncthing auto-export)
 system start             # Start all installed services
 system stop              # Stop all installed services
@@ -50,9 +50,17 @@ Single-file Bash script (~620 lines) organized as:
 - **Java switcher**: scans `/usr/lib/jvm/` for installed JDKs, skips `java-1.*` legacy dirs, updates JAVA_HOME via `sed` in `.bashrc`
 - **Syncthing auto-export**: configured via `system config`, adds a startup hook in `.bashrc`
 
+### `oh-my-posh/config.omp.json`
+
+User-supplied Oh My Posh theme, copied to `~/.script/` by `init.sh` and offered during `system install-services` (option 11). The script resolves it via `$OMP_CONFIG_SRC` (based on `$SCRIPT_DIR`), copies it to `$OMP_CONFIG_DEST` (`~/.config/oh-my-posh/config.omp.json`), and writes a matching `oh-my-posh init --config` line into the shell rc. Absent file = default theme.
+
 ### `syncthing_backup/script.sh`
 
 Standalone backup script run at shell startup. Creates timestamped tar.gz backups of Syncthing config in `~/syncthing-backups/`, retaining the 10 most recent. Deduplicates by checking if a backup already exists for today's date.
+
+### `.github/workflows/release.yml`
+
+Release automation. On a push to `main` that touches `script.sh` (or via manual `workflow_dispatch`), it reads `SCRIPT_VERSION` from the top of `script.sh`, validates it looks like `vMAJOR.MINOR.PATCH`, and creates a GitHub release tagged with exactly that value via `softprops/action-gh-release@v2`, with a body built from `git log` since the previous semver tag plus a compare link. If the tag or release already exists, the run is a no-op — so pushing unrelated `script.sh` changes is safe, and cutting a release means bumping `SCRIPT_VERSION` in a commit to `main`. The tag must match `SCRIPT_VERSION` verbatim because `system script-version` compares `tag_name` from `releases/latest` against it with a string equality test.
 
 ## Key Patterns
 
@@ -68,3 +76,4 @@ Standalone backup script run at shell startup. Creates timestamped tar.gz backup
 - Some installs (Maven, nvm/npm) require a session restart to take effect
 - The `dialog` UI can appear corrupted in full-screen mode — resize the terminal window to fix
 - `system config` MySQL setup walks through `mysql_secure_installation`; for local dev, VALIDATE PASSWORD is recommended **no**
+- Releases are cut from `SCRIPT_VERSION` in `script.sh` — bump it (keeping the leading `v`) and merge to `main` to publish a new release
