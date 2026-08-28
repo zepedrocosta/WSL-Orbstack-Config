@@ -20,7 +20,7 @@
     https://stackoverflow.com/questions/36433835/getting-cassandra-to-use-an-alternate-java-install
 '
 
-SCRIPT_VERSION="v2.0.0"
+SCRIPT_VERSION="v2.1.0"
 GITHUB_REPO="zepedrocosta/WSL-Orbstack-Config"
 
 RED="\033[0;31m"
