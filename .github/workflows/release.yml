@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - script.sh
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag and release SCRIPT_VERSION
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read SCRIPT_VERSION from script.sh
+        id: version
+        run: |
+          set -euo pipefail
+          tag=$(sed -nE 's/^SCRIPT_VERSION="?([^"]+)"?.*/\1/p' script.sh | head -n1)
+
+          if [ -z "$tag" ]; then
+            echo "::error file=script.sh::Could not read SCRIPT_VERSION from script.sh"
+            exit 1
+          fi
+
+          if ! printf '%s' "$tag" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error file=script.sh::SCRIPT_VERSION '$tag' is not of the form vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Found SCRIPT_VERSION=$tag"
+
+      - name: Check whether the release already exists
+        id: check_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release $TAG already exists - nothing to do."
+          elif git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag $TAG already exists without a release - bump SCRIPT_VERSION or create the release manually."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve previous tag
+        id: prev_tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          # Highest semver-shaped tag reachable from HEAD. Sorting by version rather
+          # than using `git describe` avoids picking a malformed legacy tag (e.g.
+          # `v.1.1.0`) that sits on the same commit as the real one (`v1.1.1`).
+          prev=$(git tag --sort=-v:refname --merged HEAD \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' \
+            | head -n1 || true)
+
+          if [ -z "$prev" ]; then
+            # No usable tag reachable from HEAD - compare against the root commit.
+            prev=$(git rev-list --max-parents=0 HEAD | tail -n1)
+            echo "::notice::No previous tag found - comparing against root commit $prev"
+          fi
+
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+          echo "Previous ref: $prev"
+
+      - name: Collect commits since previous tag
+        id: commits
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          PREV: ${{ steps.prev_tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          list=$(git log --no-merges --pretty=tformat:'- %s (%h)' "$PREV..HEAD")
+
+          if [ -z "$list" ]; then
+            list="- No commits since \`$PREV\`."
+          fi
+
+          delim="COMMITS_EOF_$(openssl rand -hex 8)"
+          {
+            echo "list<<$delim"
+            echo "$list"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "$list"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            ## What's Changed
+
+            ${{ steps.commits.outputs.list }}
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.tag }}...${{ steps.version.outputs.tag }}
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          EXISTS: ${{ steps.check_tag.outputs.exists }}
+        run: |
+          if [ "$EXISTS" = "true" ]; then
+            echo "\`$TAG\` already released - skipped." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Released [\`$TAG\`](https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG)." >> "$GITHUB_STEP_SUMMARY"
+          fi
