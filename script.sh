@@ -39,6 +39,11 @@ NOP=" is not installed."
 
 me=$USER
 ARCH=$(dpkg --print-architecture)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Config shipped alongside the script (copied to ~/.script/ by init.sh)
+OMP_CONFIG_SRC="$SCRIPT_DIR/oh-my-posh/config.omp.json"
+OMP_CONFIG_DEST="$HOME/.config/oh-my-posh/config.omp.json"
 
 update() {
 	info "Updating Ubuntu..."
@@ -68,7 +73,7 @@ help() {
 	echo -e "${CYAN}Usage:${NONE} system <command>\n"
 	echo -e "${GREEN}Available commands:${NONE}"
 	echo -e "  ${YELLOW}install${NONE}           Install dev tools (Java, Maven, nvm, pnpm, GCC, uv, TeX Live, shfmt, wget)"
-	echo -e "  ${YELLOW}install-services${NONE}  Install services (MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Neo4j, Syncthing, GitHub CLI, Firefox, Claude Code)"
+	echo -e "  ${YELLOW}install-services${NONE}  Install services (MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Neo4j, Syncthing, GitHub CLI, Firefox, Claude Code, Oh My Posh)"
 	echo -e "  ${YELLOW}config${NONE}            Configure installed tools (npm, MySQL/PostgreSQL/MariaDB, Syncthing auto-export)"
 	echo -e "  ${YELLOW}start${NONE}             Start all installed services"
 	echo -e "  ${YELLOW}stop${NONE}              Stop all installed services"
@@ -285,6 +290,7 @@ install-services)
 		8 "Syncthing" off
 		9 "GitHub CLI" off
 		10 "Claude Code" off
+		11 "Oh My Posh - Prompt theme engine" off
 	)
 	choices=$("${cmd[@]}" "${options[@]}" 2>&1 >/dev/tty)
 	clear
@@ -365,6 +371,64 @@ install-services)
 			sudo apt-get install curl
 			curl -fsSL https://claude.ai/install.sh | bash
 			success "Claude Code installed successfully!"
+			;;
+		# Oh My Posh https://ohmyposh.dev
+		11)
+			update && timer "$CONT" "$INST Oh My Posh"
+			sudo apt-get install curl unzip -y
+			if ! curl -s https://ohmyposh.dev/install.sh | bash -s; then
+				error "Oh My Posh installation failed!"
+				exit 1
+			fi
+			SHELL_RC="$HOME/.bashrc"
+			OMP_SHELL="bash"
+			if [ -n "$ZSH_VERSION" ]; then
+				SHELL_RC="$HOME/.zshrc"
+				OMP_SHELL="zsh"
+			fi
+			OMP_INIT='eval "$(oh-my-posh init '"$OMP_SHELL"')"'
+			# The installer drops the binary in ~/.local/bin, which may not be on PATH
+			if ! grep -q '.local/bin' "$SHELL_RC"; then
+				echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$SHELL_RC"
+			fi
+			export PATH="$HOME/.local/bin:$PATH"
+			success "Oh My Posh installed successfully!"
+			# Pre-install the config bundled with this script, if there is one
+			if [ -f "$OMP_CONFIG_SRC" ]; then
+				read -rp "Do you want to install the bundled Oh My Posh config? [y/N] " _omp_cfg_ans
+				if [[ "$_omp_cfg_ans" =~ ^[yY] ]]; then
+					mkdir -p "$(dirname "$OMP_CONFIG_DEST")"
+					if [ -f "$OMP_CONFIG_DEST" ]; then
+						cp "$OMP_CONFIG_DEST" "$OMP_CONFIG_DEST.bak"
+						warn "Previous config backed up to $OMP_CONFIG_DEST.bak"
+					fi
+					cp "$OMP_CONFIG_SRC" "$OMP_CONFIG_DEST"
+					OMP_INIT='eval "$(oh-my-posh init '"$OMP_SHELL"' --config "$HOME/.config/oh-my-posh/config.omp.json")"'
+					success "Config installed to $OMP_CONFIG_DEST"
+				fi
+			else
+				info "No bundled config found at $OMP_CONFIG_SRC, using the default theme."
+			fi
+			read -rp "Do you want to enable the Oh My Posh prompt in $SHELL_RC? [y/N] " _omp_ans
+			if [[ "$_omp_ans" =~ ^[yY] ]]; then
+				if grep -q "oh-my-posh init" "$SHELL_RC"; then
+					# Keep a single init line, pointing at whatever config was chosen above
+					sed -i 's|^eval "$(oh-my-posh init.*|'"$OMP_INIT"'|' "$SHELL_RC"
+					success "Prompt updated in $SHELL_RC"
+				else
+					echo "$OMP_INIT" >>"$SHELL_RC"
+					success "Prompt enabled in $SHELL_RC"
+				fi
+			else
+				info "Prompt not enabled. Add '$OMP_INIT' to $SHELL_RC to enable it later."
+			fi
+			read -rp "Do you want to install a Nerd Font (required for the prompt icons)? [y/N] " _omp_font_ans
+			if [[ "$_omp_font_ans" =~ ^[yY] ]]; then
+				oh-my-posh font install
+				warn "Set your terminal to use the installed Nerd Font"
+			fi
+			warn "$WARN"
+			info "Browse themes at https://ohmyposh.dev/docs/themes"
 			;;
 		esac
 	done
